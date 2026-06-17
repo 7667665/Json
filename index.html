@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JSON en Python · ICCD100</title>
+<style>
+  :root{
+    --bg:        #0a0f1f;
+    --bg-2:      #0f1830;
+    --panel:     #131e3a;
+    --panel-2:   #0d1730;
+    --ink:       #e8eefc;
+    --ink-soft:  #9fb0d4;
+    --ink-faint: #5d6f99;
+    --gold:      #f5b94d;   /* acento EPN */
+    --cyan:      #5ad1ff;   /* claves */
+    --green:     #7ee0a8;   /* strings */
+    --orange:    #ffb072;   /* números */
+    --purple:    #c79bff;   /* keywords */
+    --line:      #233357;
+    --code-bg:   #060b18;
+  }
+
+  *{ box-sizing:border-box; margin:0; padding:0; }
+
+  html,body{ height:100%; }
+
+  body{
+    background:
+      radial-gradient(1200px 700px at 80% -10%, rgba(90,209,255,.10), transparent 55%),
+      radial-gradient(900px 600px at -10% 110%, rgba(245,185,77,.10), transparent 55%),
+      var(--bg);
+    color:var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- Deck ---------- */
+  .deck{ position:fixed; inset:0; }
+
+  .slide{
+    position:absolute; inset:0;
+    display:none;
+    flex-direction:column;
+    justify-content:center;
+    padding: clamp(28px, 6vw, 90px);
+    padding-bottom: 92px;
+  }
+  .slide.active{ display:flex; }
+
+  /* Marca de agua de llaves { } */
+  .slide::before{
+    content:"{ }";
+    position:absolute;
+    right: -2vw; bottom: -6vw;
+    font-family: "Cascadia Code","Fira Code", Consolas, monospace;
+    font-size: 40vh;
+    font-weight:700;
+    color: rgba(255,255,255,.022);
+    pointer-events:none;
+    line-height:1;
+    user-select:none;
+  }
+
+  .eyebrow{
+    display:inline-flex; align-items:center; gap:10px;
+    font-size: clamp(.72rem, 1.4vw, .9rem);
+    letter-spacing:.28em;
+    text-transform:uppercase;
+    color:var(--gold);
+    font-weight:700;
+    margin-bottom: 22px;
+  }
+  .eyebrow .dot{ width:7px; height:7px; border-radius:50%; background:var(--gold); }
+
+  h1{
+    font-size: clamp(2.4rem, 7vw, 5.4rem);
+    line-height:1.02;
+    font-weight:800;
+    letter-spacing:-.02em;
+  }
+  h1 .brace{ color:var(--cyan); font-family:"Cascadia Code","Fira Code",monospace; }
+
+  h2{
+    font-size: clamp(1.7rem, 4.4vw, 3.1rem);
+    line-height:1.08;
+    font-weight:800;
+    letter-spacing:-.015em;
+    margin-bottom: 28px;
+    max-width: 18ch;
+  }
+  h2 .hl{ color:var(--cyan); }
+  h2 .hlg{ color:var(--gold); }
+
+  .lead{
+    font-size: clamp(1.05rem, 2.2vw, 1.5rem);
+    color:var(--ink-soft);
+    max-width: 32ch;
+    line-height:1.5;
+  }
+
+  .sub{
+    margin-top: 26px;
+    font-size: clamp(1rem, 2vw, 1.35rem);
+    color:var(--ink-soft);
+  }
+  .credit{
+    position:absolute; left: clamp(28px,6vw,90px); bottom: 92px;
+    color:var(--ink-faint); font-size:.95rem; line-height:1.7;
+  }
+  .credit b{ color:var(--ink); font-weight:600; }
+
+  /* ---------- Fragmentos (se van llenando) ---------- */
+  .fragment{
+    opacity:0;
+    transform: translateY(14px);
+    transition: opacity .38s ease, transform .38s ease;
+  }
+  .fragment.shown{ opacity:1; transform:none; }
+  @media (prefers-reduced-motion: reduce){
+    .fragment{ transition:none; transform:none; }
+  }
+
+  /* ---------- Lista con viñetas ---------- */
+  .points{ list-style:none; display:flex; flex-direction:column; gap:16px; margin-top: 8px; }
+  .points li{
+    display:flex; align-items:flex-start; gap:16px;
+    font-size: clamp(1.02rem, 2.1vw, 1.45rem);
+    color:var(--ink);
+    line-height:1.4;
+  }
+  .points .mk{
+    flex:0 0 auto;
+    margin-top:.18em;
+    width: 26px; height:26px; border-radius:8px;
+    display:grid; place-items:center;
+    background: rgba(90,209,255,.12);
+    color:var(--cyan);
+    font-family:"Cascadia Code","Fira Code",monospace;
+    font-weight:700; font-size:.9rem;
+  }
+  .points .mk.gold{ background:rgba(245,185,77,.14); color:var(--gold); }
+  .points small{ display:block; color:var(--ink-soft); font-size:.82em; font-weight:400; margin-top:3px; }
+
+  /* ---------- "Chips" de usos ---------- */
+  .chips{ display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; max-width: 30ch; }
+  .chip{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:16px 20px;
+    font-size: clamp(.95rem,1.9vw,1.25rem);
+    font-weight:600;
+    display:flex; align-items:center; gap:12px;
+  }
+  .chip .ico{ font-size:1.3em; }
+
+  /* ---------- Código ---------- */
+  .code{
+    background:var(--code-bg);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding: clamp(16px,2.5vw,26px) clamp(18px,3vw,30px);
+    font-family:"Cascadia Code","Fira Code", Consolas, Monaco, monospace;
+    font-size: clamp(.85rem, 1.7vw, 1.18rem);
+    line-height:1.65;
+    overflow:auto;
+    max-width: 720px;
+    box-shadow: 0 24px 60px rgba(0,0,0,.4);
+  }
+  .code .winbar{ display:flex; gap:7px; margin-bottom:14px; }
+  .code .winbar span{ width:11px; height:11px; border-radius:50%; background:#2a3a5e; }
+  .code .winbar span:first-child{ background:#ff5f56; }
+  .code .winbar span:nth-child(2){ background:#ffbd2e; }
+  .code .winbar span:nth-child(3){ background:#27c93f; }
+  .code pre{ white-space:pre; }
+
+  .kw{ color:var(--purple); }
+  .fn{ color:var(--cyan); }
+  .str{ color:var(--green); }
+  .num{ color:var(--orange); }
+  .com{ color:var(--ink-faint); font-style:italic; }
+  .key{ color:var(--cyan); }
+  .bool{ color:var(--orange); }
+  .pn{ color:var(--ink-soft); }
+
+  .out{
+    margin-top:16px;
+    background: rgba(126,224,168,.06);
+    border-left:3px solid var(--green);
+    border-radius:8px;
+    padding:12px 18px;
+    font-family:"Cascadia Code","Fira Code",monospace;
+    font-size: clamp(.82rem,1.6vw,1.08rem);
+    color:var(--ink);
+    max-width:720px;
+  }
+  .out .tag{ display:block; color:var(--ink-faint); font-size:.78em; letter-spacing:.15em; text-transform:uppercase; margin-bottom:6px; }
+
+  .layout{ display:grid; grid-template-columns: 1fr 1fr; gap: clamp(24px,4vw,56px); align-items:center; }
+  @media (max-width: 900px){ .layout{ grid-template-columns:1fr; gap:24px; } .code{max-width:none;} }
+
+  /* ---------- Tabla de mapeo ---------- */
+  .map{ border-collapse:collapse; margin-top:6px; width:100%; max-width:640px; }
+  .map td{ padding:13px 16px; border-bottom:1px solid var(--line); font-size:clamp(.95rem,1.9vw,1.25rem); }
+  .map tr td:first-child{ font-family:"Cascadia Code","Fira Code",monospace; color:var(--green); }
+  .map tr td:nth-child(2){ color:var(--ink-faint); text-align:center; width:60px; }
+  .map tr td:last-child{ font-family:"Cascadia Code","Fira Code",monospace; color:var(--cyan); }
+
+  .note{
+    margin-top:24px;
+    background:rgba(245,185,77,.08);
+    border:1px solid rgba(245,185,77,.3);
+    border-radius:12px;
+    padding:16px 20px;
+    color:var(--ink);
+    font-size: clamp(.95rem,1.9vw,1.2rem);
+    max-width: 36ch;
+  }
+  .note b{ color:var(--gold); }
+
+  /* Regla mnemotécnica (cierre) */
+  .rule{ display:flex; flex-direction:column; gap:14px; margin-top:10px; max-width:620px; }
+  .rule .row{
+    display:flex; align-items:center; gap:18px;
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:14px; padding:18px 22px;
+    font-size: clamp(1rem,2vw,1.35rem);
+  }
+  .rule .row code{ font-family:"Cascadia Code","Fira Code",monospace; color:var(--cyan); font-weight:700; }
+  .rule .row .big{ font-size:1.5em; }
+
+  /* ---------- Barra inferior: controles ---------- */
+  .bar{
+    position:fixed; left:0; right:0; bottom:0; height:64px;
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 0 clamp(20px,5vw,60px);
+    background: linear-gradient(to top, var(--bg-2), transparent);
+    z-index:50;
+  }
+  .brand{ display:flex; align-items:center; gap:12px; color:var(--ink-soft); font-size:.85rem; font-weight:600; letter-spacing:.04em; }
+  .brand .logo{
+    font-family:"Cascadia Code","Fira Code",monospace;
+    color:var(--gold); font-weight:800; font-size:1.1rem;
+    border:1.5px solid var(--gold); border-radius:8px; padding:2px 8px;
+  }
+  .dots{ display:flex; gap:9px; }
+  .dots button{
+    width:9px; height:9px; border-radius:50%; border:0; padding:0;
+    background:var(--ink-faint); opacity:.45; cursor:pointer; transition:.2s;
+  }
+  .dots button:hover{ opacity:.8; }
+  .dots button.on{ background:var(--gold); opacity:1; transform:scale(1.35); }
+  .counter{ color:var(--ink-soft); font-size:.9rem; font-variant-numeric:tabular-nums; min-width:54px; text-align:right; }
+  .counter b{ color:var(--ink); }
+
+  .hint{
+    position:fixed; top:18px; right:22px;
+    color:var(--ink-faint); font-size:.78rem; letter-spacing:.05em;
+    z-index:50; user-select:none;
+  }
+  .hint kbd{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:2px 7px; color:var(--ink-soft); font-family:inherit; margin:0 1px;
+  }
+</style>
+</head>
+<body>
+
+<div class="hint">Avanza con <kbd>→</kbd> <kbd>Espacio</kbd> · Retrocede con <kbd>←</kbd></div>
+
+<div class="deck" id="deck">
+
+  <!-- 1 · PORTADA -->
+  <section class="slide active">
+    <div class="eyebrow"><span class="dot"></span> ICCD100 · Fundamentos de Programación</div>
+    <h1><span class="brace">{</span> JSON <span class="brace">}</span><br>en Python</h1>
+    <p class="sub">Guardar e intercambiar datos de forma ordenada</p>
+    <div class="credit"><b>Escuela Politécnica Nacional</b><br>Tema: el módulo <code>json</code></div>
+  </section>
+
+  <!-- 2 · ¿QUÉ ES? -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span> La idea</div>
+    <h2>¿Qué es <span class="hl">JSON</span>?</h2>
+    <ul class="points">
+      <li class="fragment"><span class="mk">1</span><div><b>J</b>ava<b>S</b>cript <b>O</b>bject <b>N</b>otation: un formato para escribir datos.</div></li>
+      <li class="fragment"><span class="mk">2</span><div>En el fondo es <b>solo texto</b>, igual que el contenido de los archivos que ya aprendiste a leer y escribir.</div></li>
+      <li class="fragment"><span class="mk gold">3</span><div>Lo entienden casi <b>todos los lenguajes y programas</b>, por eso sirve para intercambiar información.</div></li>
+    </ul>
+  </section>
+
+  <!-- 3 · ¿DÓNDE SE USA? -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span> ¿Para qué sirve?</div>
+    <h2>Lo usas <span class="hlg">todos los días</span> sin darte cuenta</h2>
+    <div class="chips">
+      <div class="chip fragment"><span class="ico">📱</span> Apps del celular</div>
+      <div class="chip fragment"><span class="ico">🌐</span> Páginas web y APIs</div>
+      <div class="chip fragment"><span class="ico">🎮</span> Guardar partidas</div>
+      <div class="chip fragment"><span class="ico">⚙️</span> Configuración de programas</div>
+    </div>
+  </section>
+
+  <!-- 4 · CÓMO SE VE -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span> Su forma</div>
+    <h2>¿Cómo <span class="hl">se ve</span> un JSON?</h2>
+    <div class="layout">
+      <div class="code fragment">
+        <div class="winbar"><span></span><span></span><span></span></div>
+<pre>{
+  <span class="key">"nombre"</span><span class="pn">:</span> <span class="str">"Ana"</span>,
+  <span class="key">"edad"</span><span class="pn">:</span> <span class="num">20</span>,
+  <span class="key">"aprobado"</span><span class="pn">:</span> <span class="bool">true</span>,
+  <span class="key">"materias"</span><span class="pn">:</span> [<span class="str">"Cálculo"</span>, <span class="str">"Programación"</span>]
+}</pre>
+      </div>
+      <ul class="points">
+        <li class="fragment"><span class="mk">"</span><div>Las <b>claves</b> van entre comillas.</div></li>
+        <li class="fragment"><span class="mk">:</span><div>Cada clave tiene un <b>valor</b>, separados por dos puntos.</div></li>
+        <li class="fragment"><span class="mk gold">,</span><div>Los pares se separan con <b>comas</b>.</div></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 5 · TIPOS DE VALORES -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span> Contenido</div>
+    <h2>¿Qué <span class="hl">valores</span> puede guardar?</h2>
+    <ul class="points">
+      <li class="fragment"><span class="mk">""</span><div>Texto entre comillas — <span class="str">"Ana"</span></div></li>
+      <li class="fragment"><span class="mk">12</span><div>Números — <span class="num">20</span>, <span class="num">3.5</span></div></li>
+      <li class="fragment"><span class="mk">✓✗</span><div><span class="bool">true</span> / <span class="bool">false</span> y <span class="bool">null</span> (vacío)</div></li>
+      <li class="fragment"><span class="mk gold">[ ]</span><div>Listas de valores — como las que ya conoces</div></li>
+      <li class="fragment"><span class="mk gold">{ }</span><div>Otros objetos adentro</div></li>
+    </ul>
+  </section>
+
+  <!-- 6 · MAPEO JSON <-> PYTHON -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span> La traducción</div>
+    <h2><span class="hl">JSON</span> y <span class="hlg">Python</span> se entienden</h2>
+    <div class="layout">
+      <table class="map">
+        <tr class="fragment"><td>"texto"</td><td>→</td><td>str</td></tr>
+        <tr class="fragment"><td>número</td><td>→</td><td>int / float</td></tr>
+        <tr class="fragment"><td>true / false</td><td>→</td><td>True / False</td></tr>
+        <tr class="fragment"><td>null</td><td>→</td><td>None</td></tr>
+        <tr class="fragment"><td>[ ... ]</td><td>→</td><td>list</td></tr>
+        <tr class="fragment"><td>{ ... }</td><td>→</td><td>dict</td></tr>
+      </table>
+      <div class="note fragment">Un <b>objeto JSON</b> (entre llaves) se convierte en un <b>diccionario</b> de Python: pares <i>clave → valor</i>.</div>
+    </div>
+  </section>
+
+  <!-- 7 · EL MÓDULO -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span> Manos a la obra</div>
+    <h2>Python ya trae el módulo <span class="hl">json</span></h2>
+    <div class="code fragment">
+      <div class="winbar"><span></span><span></span><span></span></div>
+<pre><span class="kw">import</span> json</pre>
+    </div>
+    <p class="lead fragment" style="margin-top:24px">No hay que instalar nada. Solo lo importamos y usamos sus funciones.</p>
+  </section>
+
+  <!-- 8 · dumps -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span> Python → JSON</div>
+    <h2>Convertir a texto: <span class="hl">json.dumps()</span></h2>
+    <div class="layout">
+      <div class="code fragment">
+        <div class="winbar"><span></span><span></span><span></span></div>
+<pre><span class="kw">import</span> json
+
+estudiante <span class="pn">=</span> {
+    <span class="str">"nombre"</span>: <span class="str">"Ana"</span>,
+    <span class="str">"edad"</span>: <span class="num">20</span>,
+    <span class="str">"aprobado"</span>: <span class="kw">True</span>
+}
+
+texto <span class="pn">=</span> json.<span class="fn">dumps</span>(estudiante)
+<span class="fn">print</span>(texto)</pre>
+      </div>
+      <div>
+        <div class="out fragment">
+          <span class="tag">Salida</span>
+          {"nombre": "Ana", "edad": 20, "aprobado": true}
+        </div>
+        <div class="note fragment"><b>dumps</b> = "dump <u>s</u>tring". Fíjate: <code>True</code> de Python se escribe <code>true</code> en JSON.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 · loads -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span> JSON → Python</div>
+    <h2>Leer ese texto: <span class="hl">json.loads()</span></h2>
+    <div class="layout">
+      <div class="code fragment">
+        <div class="winbar"><span></span><span></span><span></span></div>
+<pre><span class="kw">import</span> json
+
+texto <span class="pn">=</span> <span class="str">'{"nombre": "Ana", "edad": 20}'</span>
+
+datos <span class="pn">=</span> json.<span class="fn">loads</span>(texto)
+
+<span class="fn">print</span>(datos[<span class="str">"nombre"</span>])
+<span class="fn">print</span>(datos[<span class="str">"edad"</span>])</pre>
+      </div>
+      <div>
+        <div class="out fragment">
+          <span class="tag">Salida</span>
+          Ana<br>20
+        </div>
+        <div class="note fragment"><b>loads</b> = "load <u>s</u>tring". Ahora <code>datos</code> es un diccionario y accedemos con la clave.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10 · dump (archivo) -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span> Con archivos</div>
+    <h2>Guardar en un archivo: <span class="hl">json.dump()</span></h2>
+    <div class="layout">
+      <div class="code fragment">
+        <div class="winbar"><span></span><span></span><span></span></div>
+<pre><span class="kw">import</span> json
+
+estudiante <span class="pn">=</span> {<span class="str">"nombre"</span>: <span class="str">"Ana"</span>, <span class="str">"edad"</span>: <span class="num">20</span>}
+
+<span class="kw">with</span> <span class="fn">open</span>(<span class="str">"datos.json"</span>, <span class="str">"w"</span>) <span class="kw">as</span> archivo:
+    json.<span class="fn">dump</span>(estudiante, archivo)</pre>
+      </div>
+      <div>
+        <div class="out fragment">
+          <span class="tag">Resultado</span>
+          Se crea el archivo <b>datos.json</b><br>con la información adentro.
+        </div>
+        <div class="note fragment">Usamos <code>with open(...)</code>, igual que cuando aprendiste a escribir archivos. <b>dump</b> (sin "s") escribe directo al archivo.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11 · load (archivo) -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span> Con archivos</div>
+    <h2>Leer desde un archivo: <span class="hl">json.load()</span></h2>
+    <div class="layout">
+      <div class="code fragment">
+        <div class="winbar"><span></span><span></span><span></span></div>
+<pre><span class="kw">import</span> json
+
+<span class="kw">with</span> <span class="fn">open</span>(<span class="str">"datos.json"</span>, <span class="str">"r"</span>) <span class="kw">as</span> archivo:
+    datos <span class="pn">=</span> json.<span class="fn">load</span>(archivo)
+
+<span class="fn">print</span>(datos)</pre>
+      </div>
+      <div>
+        <div class="out fragment">
+          <span class="tag">Salida</span>
+          {'nombre': 'Ana', 'edad': 20}
+        </div>
+        <div class="note fragment"><b>load</b> (sin "s") lee el archivo y lo convierte en datos de Python.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12 · REGLA MNEMOTÉCNICA -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span> Para no confundirse</div>
+    <h2>Truco para <span class="hlg">recordarlas</span></h2>
+    <div class="rule">
+      <div class="row fragment"><span class="big">🔤</span><div>Con <code>s</code> → trabaja con <b>texto</b> (string)<br><code>dumps</code> · <code>loads</code></div></div>
+      <div class="row fragment"><span class="big">📄</span><div>Sin <code>s</code> → trabaja con <b>archivos</b> (file)<br><code>dump</code> · <code>load</code></div></div>
+      <div class="row fragment"><span class="big">↔️</span><div><b>dump</b> = guardar / convertir &nbsp;·&nbsp; <b>load</b> = leer / recuperar</div></div>
+    </div>
+  </section>
+
+  <!-- 13 · CIERRE -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span> Resumen</div>
+    <h1 style="font-size:clamp(2rem,5.5vw,4rem)">Ya sabes manejar<br><span class="brace">{</span> JSON <span class="brace">}</span></h1>
+    <ul class="points" style="margin-top:30px">
+      <li class="fragment"><span class="mk">1</span><div>JSON es texto ordenado en pares <i>clave → valor</i>.</div></li>
+      <li class="fragment"><span class="mk">2</span><div><code>dumps</code>/<code>loads</code> con texto · <code>dump</code>/<code>load</code> con archivos.</div></li>
+      <li class="fragment"><span class="mk gold">3</span><div>¡A practicar guardando y leyendo tus propios datos!</div></li>
+    </ul>
+    <div class="credit"><b>ICCD100</b> · Fundamentos de Programación · EPN</div>
+  </section>
+
+</div>
+
+<!-- Barra de controles -->
+<div class="bar">
+  <div class="brand"><span class="logo">{ }</span> ICCD100 · EPN</div>
+  <div class="dots" id="dots"></div>
+  <div class="counter"><b id="cur">1</b> / <span id="tot">13</span></div>
+</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const dotsWrap = document.getElementById('dots');
+  const curEl = document.getElementById('cur');
+  document.getElementById('tot').textContent = slides.length;
+
+  let current = 0;
+  let frag = 0;
+
+  // crear puntos
+  slides.forEach((_, i) => {
+    const b = document.createElement('button');
+    b.addEventListener('click', () => goTo(i));
+    dotsWrap.appendChild(b);
+  });
+  const dots = Array.from(dotsWrap.children);
+
+  const fragsOf = i => Array.from(slides[i].querySelectorAll('.fragment'));
+
+  function render(){
+    slides.forEach((s, i) => s.classList.toggle('active', i === current));
+    const fr = fragsOf(current);
+    fr.forEach((f, i) => f.classList.toggle('shown', i < frag));
+    dots.forEach((d, i) => d.classList.toggle('on', i === current));
+    curEl.textContent = current + 1;
+  }
+
+  function next(){
+    const fr = fragsOf(current);
+    if (frag < fr.length){ frag++; render(); return; }
+    if (current < slides.length - 1){ current++; frag = 0; render(); }
+  }
+  function prev(){
+    if (frag > 0){ frag--; render(); return; }
+    if (current > 0){ current--; frag = fragsOf(current).length; render(); }
+  }
+  function goTo(i){ current = i; frag = 0; render(); }
+
+  document.addEventListener('keydown', e => {
+    if (['ArrowRight',' ','PageDown'].includes(e.key)){ e.preventDefault(); next(); }
+    else if (['ArrowLeft','PageUp'].includes(e.key)){ e.preventDefault(); prev(); }
+    else if (e.key === 'Home'){ goTo(0); }
+    else if (e.key === 'End'){ goTo(slides.length - 1); }
+  });
+
+  // avanzar al tocar/click en cualquier parte (cómodo en clase)
+  document.addEventListener('click', e => {
+    if (e.target.closest('.bar') || e.target.closest('.hint')) return;
+    next();
+  });
+
+  render();
+</script>
+</body>
+</html>
