@@ -265,6 +265,42 @@
     background:var(--panel); border:1px solid var(--line); border-radius:6px;
     padding:2px 7px; color:var(--ink-soft); font-family:inherit; margin:0 1px;
   }
+
+  /* ---------- Juego del ahorcado ---------- */
+  .game{ display:grid; grid-template-columns:.8fr 1.2fr; gap:clamp(20px,4vw,50px); align-items:center; margin-top:10px; }
+  @media (max-width:900px){ .game{ grid-template-columns:1fr; gap:20px; } }
+  .gallows{ width:100%; max-width:230px; margin:0 auto; display:block; }
+  .gallows .frame{ stroke:var(--ink-faint); stroke-width:6; stroke-linecap:round; fill:none; }
+  .gallows .part{ stroke:var(--orange); stroke-width:5; stroke-linecap:round; fill:none; opacity:0; transition:opacity .25s ease; }
+  .gallows .part.show{ opacity:1; }
+  .lives{ text-align:center; margin-top:10px; color:var(--ink-soft); font-size:.95rem; }
+  .lives b{ color:var(--orange); font-variant-numeric:tabular-nums; }
+  .word{ display:flex; flex-wrap:wrap; gap:9px; margin-bottom:18px; }
+  .word .ltr{
+    width:32px; height:42px; border-bottom:3px solid var(--cyan);
+    display:grid; place-items:center;
+    font-family:"Cascadia Code","Fira Code",monospace; font-size:1.5rem; font-weight:700; color:var(--ink);
+  }
+  .word .ltr.blank{ color:transparent; }
+  .msg{ min-height:30px; font-size:1.1rem; font-weight:700; color:var(--ink-soft); margin-bottom:16px; }
+  .msg.win{ color:var(--green); }
+  .msg.lose{ color:var(--orange); }
+  .keys{ display:grid; grid-template-columns:repeat(9,1fr); gap:8px; max-width:520px; }
+  @media (max-width:900px){ .keys{ grid-template-columns:repeat(7,1fr); } }
+  .keys button{
+    aspect-ratio:1/1; border:1px solid var(--line); background:var(--panel); color:var(--ink);
+    border-radius:9px; font-size:1.05rem; font-weight:700; cursor:pointer; font-family:inherit; padding:0;
+    transition:.15s;
+  }
+  .keys button:hover:not(:disabled){ border-color:var(--cyan); color:var(--cyan); }
+  .keys button:disabled{ cursor:default; }
+  .keys button.ok{ background:rgba(126,224,168,.16); color:var(--green); border-color:transparent; }
+  .keys button.no{ background:transparent; color:var(--ink-faint); border-color:transparent; opacity:.35; }
+  .gbtn{
+    margin-top:22px; background:var(--gold); color:#201500; border:0; border-radius:10px;
+    padding:12px 24px; font-size:1rem; font-weight:800; cursor:pointer; font-family:inherit;
+  }
+  .gbtn:hover{ filter:brightness(1.08); }
 </style>
 </head>
 <body>
@@ -492,6 +528,60 @@ estudiante <span class="pn">=</span> {<span class="str">"nombre"</span>: <span c
     <div class="credit"><b>ICCD100</b> · Fundamentos de Programación · EPN</div>
   </section>
 
+  <!-- 14 · BONUS: AHORCADO CON JSON -->
+  <section class="slide">
+    <div class="eyebrow"><span class="dot"></span> Bonus · Proyecto</div>
+    <h2>Un juego que lee palabras de un <span class="hl">JSON</span></h2>
+    <div class="layout">
+      <div class="code fragment">
+        <div class="winbar"><span></span><span></span><span></span></div>
+<pre><span class="com"># palabras.json</span>
+{
+  <span class="key">"categoria"</span>: <span class="str">"Programación"</span>,
+  <span class="key">"palabras"</span>: [
+    <span class="str">"VARIABLE"</span>, <span class="str">"FUNCION"</span>,
+    <span class="str">"BUCLE"</span>, <span class="str">"LISTA"</span>,
+    <span class="str">"PYTHON"</span>, <span class="str">"ARCHIVO"</span>
+  ]
+}</pre>
+      </div>
+      <ul class="points">
+        <li class="fragment"><span class="mk">1</span><div>Las palabras del juego viven en <b>palabras.json</b>.</div></li>
+        <li class="fragment"><span class="mk">2</span><div>Con <code>json.load()</code> las traemos a Python como una <b>lista</b>.</div></li>
+        <li class="fragment"><span class="mk gold">3</span><div>El juego elige una palabra… ¡y a adivinar! →</div></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 15 · JUEGO JUGABLE -->
+  <section class="slide" id="gameSlide">
+    <div class="eyebrow"><span class="dot"></span> Bonus · ¡A jugar!</div>
+    <h2>El Ahorcado <span class="hlg">🎮</span></h2>
+    <div class="game no-advance">
+      <div>
+        <svg class="gallows" viewBox="0 0 200 250" xmlns="http://www.w3.org/2000/svg">
+          <line class="frame" x1="20" y1="240" x2="115" y2="240"/>
+          <line class="frame" x1="45" y1="240" x2="45" y2="20"/>
+          <line class="frame" x1="45" y1="20" x2="140" y2="20"/>
+          <line class="frame" x1="140" y1="20" x2="140" y2="45"/>
+          <circle class="part" cx="140" cy="62" r="17"/>
+          <line class="part" x1="140" y1="79" x2="140" y2="150"/>
+          <line class="part" x1="140" y1="95" x2="113" y2="120"/>
+          <line class="part" x1="140" y1="95" x2="167" y2="120"/>
+          <line class="part" x1="140" y1="150" x2="118" y2="188"/>
+          <line class="part" x1="140" y1="150" x2="162" y2="188"/>
+        </svg>
+        <div class="lives">Errores: <b id="wrongCount">0</b> / 6</div>
+      </div>
+      <div>
+        <div class="word" id="wordBox"></div>
+        <div class="msg" id="msg">Adivina la palabra de programación</div>
+        <div class="keys" id="keys"></div>
+        <button class="gbtn" id="newBtn">Nueva palabra</button>
+      </div>
+    </div>
+  </section>
+
 </div>
 
 <!-- Barra de controles -->
@@ -548,9 +638,71 @@ estudiante <span class="pn">=</span> {<span class="str">"nombre"</span>: <span c
 
   // avanzar al tocar/click en cualquier parte (cómodo en clase)
   document.addEventListener('click', e => {
-    if (e.target.closest('.bar') || e.target.closest('.hint')) return;
+    if (e.target.closest('.bar') || e.target.closest('.hint') || e.target.closest('.no-advance')) return;
     next();
   });
+
+  // ----- Juego del ahorcado -----
+  (function(){
+    const WORDS = ["VARIABLE","FUNCION","BUCLE","LISTA","PYTHON","ARCHIVO",
+                   "ENTERO","CADENA","TUPLA","PROGRAMA","CODIGO","CONDICION"];
+    const ALPH = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
+    const wordBox = document.getElementById('wordBox');
+    const keysBox = document.getElementById('keys');
+    const msg     = document.getElementById('msg');
+    const wrongEl = document.getElementById('wrongCount');
+    const parts   = Array.from(document.querySelectorAll('.gallows .part'));
+    const newBtn  = document.getElementById('newBtn');
+    const gameSlide = document.getElementById('gameSlide');
+    if (!wordBox) return;
+
+    let secret, guessed, wrong, over;
+    const MAX = 6;
+
+    function build(){
+      keysBox.innerHTML = '';
+      ALPH.forEach(L => {
+        const b = document.createElement('button');
+        b.textContent = L;
+        b.addEventListener('click', () => guess(L));
+        keysBox.appendChild(b);
+      });
+    }
+    function start(){
+      secret = WORDS[Math.floor(Math.random() * WORDS.length)];
+      guessed = new Set(); wrong = 0; over = false;
+      Array.from(keysBox.children).forEach(b => { b.disabled = false; b.className = ''; });
+      msg.className = 'msg'; msg.textContent = 'Adivina la palabra de programación';
+      draw();
+    }
+    function draw(){
+      wordBox.innerHTML = secret.split('').map(ch => {
+        const shown = guessed.has(ch) || over;
+        return '<span class="ltr' + (shown ? '' : ' blank') + '">' + ch + '</span>';
+      }).join('');
+      parts.forEach((p, i) => p.classList.toggle('show', i < wrong));
+      wrongEl.textContent = wrong;
+    }
+    function guess(L){
+      if (over || guessed.has(L)) return;
+      guessed.add(L);
+      const btn = Array.from(keysBox.children).find(b => b.textContent === L);
+      if (secret.includes(L)){ btn.classList.add('ok'); }
+      else { btn.classList.add('no'); wrong++; }
+      btn.disabled = true;
+      const won = secret.split('').every(ch => guessed.has(ch));
+      if (won){ over = true; msg.className = 'msg win'; msg.textContent = '¡Ganaste! 🎉'; }
+      else if (wrong >= MAX){ over = true; msg.className = 'msg lose'; msg.textContent = 'La palabra era: ' + secret; }
+      draw();
+    }
+    newBtn.addEventListener('click', start);
+    document.addEventListener('keydown', e => {
+      if (!gameSlide.classList.contains('active')) return;
+      const k = e.key.toUpperCase();
+      if (k.length === 1 && k >= 'A' && k <= 'Z') guess(k);
+    });
+    build(); start();
+  })();
 
   render();
 </script>
